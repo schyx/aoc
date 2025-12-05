@@ -1,0 +1,10 @@
+[custom.all.aoc]
+type = "local"
+path = "."
+ipkg = "aoc.ipkg"
+test = "test/test.ipkg"
+
+[custom.all.aoc-test]
+type = "local"
+path = "test"
+ipkg = "test.ipkg"
