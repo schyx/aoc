@@ -7,6 +7,7 @@ import Y2025.Day3
 import Y2025.Day4
 import Y2025.Day5
 import Y2025.Day6
+import Y2025.Day7
 
 import System
 import System.File
@@ -26,6 +27,8 @@ funcAndDataFile [_, _, "2025", "5", "1"] = ("data/2025/day5.txt", printLn . solv
 funcAndDataFile [_, _, "2025", "5", "2"] = ("data/2025/day5.txt", printLn . solve2025D5P2)
 funcAndDataFile [_, _, "2025", "6", "1"] = ("data/2025/day6.txt", printLn . solve2025D6P1)
 funcAndDataFile [_, _, "2025", "6", "2"] = ("data/2025/day6.txt", printLn . solve2025D6P2)
+funcAndDataFile [_, _, "2025", "7", "1"] = ("data/2025/day7.txt", printLn . solve2025D7P1)
+funcAndDataFile [_, _, "2025", "7", "2"] = ("data/2025/day7.txt", printLn . solve2025D7P2)
 funcAndDataFile [_, _, _, _, _]          = ("src/Main.idr", const $ putStrLn "Not yet implemented")
 funcAndDataFile _                        =
   ("src/Main.idr", const $ putStrLn "Wrong number of arguments: Usage is `pack run aoc -- <YEAR> <DAY> <PART>`")
