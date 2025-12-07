@@ -50,11 +50,11 @@ toCephalopodProblems vects = toList $ map toProblem2 rawProbs
     toProblem2 : List (Vect m Char) -> Problem2
     toProblem2 []           = MkProblem2 [] Plus
     toProblem2 (v1 :: rest) =
-      let l = toList v1
-          op = case last' l of
-                 Just '+' => Plus
-                 Just '*' => Times
-                 _        => Plus
+      let l   = toList v1
+          op  = case last' l of
+                  Just '+' => Plus
+                  Just '*' => Times
+                  _        => Plus
           v1' = case init' l of
                   Just v  => v
                   Nothing => ['0']
