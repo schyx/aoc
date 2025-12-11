@@ -1,18 +1,21 @@
 module Y2025.Day10
 
+import Debug.Trace
+import Data.Fin
 import Data.SortedMap
 import Data.String
+import Data.Vect
 import Parser
 import Queue
 import Utils
 
-record Manual where
+record Manual m where
   constructor MkManual
-  target  : SortedMap Int Bool
-  flips   : SortedMap Int (List Int)
-  joltage : SortedMap Int Int
+  target  : Vect m Bool
+  flips   : SortedMap Int (List (Fin m))
+  joltage : Vect m Int
 
-Show Manual where
+Show (Manual m) where
   show manual =
     "(MkManual "
       ++ show manual.target
@@ -22,118 +25,135 @@ Show Manual where
       ++ show manual.joltage
       ++ ")"
 
-parseTargets : Parser (SortedMap Int Bool)
-parseTargets =
-  Builtin.fst
-    . foldl
-        (\(prevMap, idx), char => (insert idx (char == '#') prevMap, idx + 1))
-        (empty, 0)
-        <$> (pChar '[' *> pSpan (/= ']') <* pChar ']')
+data Wrapper : Type where
+  MkWrapper : Manual m -> Wrapper
 
-parseFlip : Parser (List Int)
-parseFlip = pChar '(' *> ((::) <$> (pInt) <*> (many (pChar ',' *> pInt))) <* pChar ')' <* pChar ' '
+findSize : String -> Nat
+findSize input = length $ filter (/= '[') $ fst $ span (/= ']') $ unpack input
 
-parseFlips : Parser (SortedMap Int (List Int))
-parseFlips = toIndexedMap <$> many parseFlip
+parseLights : (m : Nat) -> Parser (Maybe (Vect m Bool))
+parseLights m = toVect m . map (== '#') <$> (pChar '[' *> pSpan (/= ']') <* pChar ']')
 
-parseJoltages : Parser (SortedMap Int Int)
-parseJoltages = toIndexedMap <$> (pChar '{' *> ((::) <$> pInt <*> many (pChar ',' *> pInt)) <* pChar '}')
+parseFlip : (m : Nat) -> Parser (Maybe (List (Fin m)))
+parseFlip m = sequence <$> (pChar '(' *> ((::) <$> pFin m <*> (many (pChar ',' *> pFin m))) <* pChar ')' <* pChar ' ')
 
-parseManual : Parser Manual
-parseManual = MkManual <$> (parseTargets <* pChar ' ') <*> parseFlips <*> parseJoltages
+parseFlips : (m : Nat) -> Parser (Maybe (SortedMap Int (List (Fin m))))
+parseFlips m = (map toIndexedMap) . sequence <$> many (parseFlip m)
 
-unifyParseOutput : Maybe (Manual, List Char) -> Either String Manual
+parseJoltages : (m : Nat) -> Parser (Maybe (Vect m Int))
+parseJoltages m = toVect m <$> (pChar '{' *> ((::) <$> pInt <*> many (pChar ',' *> pInt)) <* pChar '}')
+
+parseManual : (m : Nat) -> Parser (Maybe (Manual m))
+parseManual m = do
+  lights <- parseLights m
+  const () <$> pChar ' '
+  flips <- parseFlips m
+  joltages <- parseJoltages m
+  pure $ MkManual <$> lights <*> flips <*> joltages
+
+unifyParseOutput : Maybe (Maybe (Manual m), List Char) -> Either String (Manual m)
 unifyParseOutput Nothing              = Left "Unable to parse input"
-unifyParseOutput (Just (_, (_ :: _))) = Left "Leftover chars after parsing"
-unifyParseOutput (Just (manual, []))  = Right manual
+unifyParseOutput (Just (_, chars@(_ :: _))) = Left $ "Leftover chars after parsing: " ++ pack chars
+unifyParseOutput (Just (Nothing, [])) = Left "Parsing error!"
+unifyParseOutput (Just (Just m, []))  = Right m
 
-record FlipState where
+record FlipState m where
   constructor MkFlipState
   moves : List Int
-  state : SortedMap Int Bool
+  state : Vect m Bool
 
-Show FlipState where
-  show (MkFlipState moves state) = "(MkFlipState " ++ show moves ++ " " ++ show state ++ ")"
+applyFlips : List (Fin m) -> Vect m Bool -> Vect m Bool
+applyFlips flips state = foldl (\prevState, flip => updateAt flip not prevState) state flips
 
-applyFlips : List Int -> SortedMap Int Bool -> SortedMap Int Bool
-applyFlips flips state = foldl (\oldState, flip => updateExisting not flip oldState) state flips
-
-leastFlips : Manual -> Int
-leastFlips (MkManual target flips _) =
-  if all (== False) $ values target
-    then 0
-    else go $ singleton (MkFlipState [] $ map (const False) target)
+manualFlips : Manual m -> Int
+manualFlips (MkManual target flips _) = dfs $ singleton ([], map (const False) target)
   where
-    numFlips = the Int $ cast $ size flips
-    go : Queue FlipState -> Int
-    go states = case pop states of
-      Nothing                                                 => -111111111111111
-      Just ((MkFlipState prevMoves lightState), poppedStates) =>
-        let prevMove = case head' prevMoves of
-              Nothing  => -1
+    dfs : Queue (List Int, Vect m Bool) -> Int
+    dfs states = case pop states of
+      Nothing                                        => -11111111111
+      Just ((prevMoves, currentState), poppedStates) =>
+        let numFlips = the Int $ cast $ size flips
+            prevMove = case head' prevMoves of
+              Nothing  => the Int $ -1
               Just val => val
             possibleMoves =
               if prevMove + 1 == numFlips
-                then the (List Int) []
-                else [prevMove + 1 .. numFlips - 1]
-            newStates = map
-              (\move => let flips := case lookup move flips of
-                                       Nothing => the (List Int) []
-                                       Just f  => f
-                         in MkFlipState (move :: prevMoves) (applyFlips flips lightState)
-              )
-              possibleMoves
-         in if any ((== target) . state) newStates
-              then cast $ length prevMoves + 1
-              else go $ foldr push poppedStates newStates
+                 then the (List Int) []
+                 else [prevMove + 1 .. numFlips - 1]
+            newStates = map (\move => let flips := case lookup move flips of 
+                                                    Nothing => the (List (Fin _)) []
+                                                    Just f  => f
+                                       in (move :: prevMoves, applyFlips flips currentState)) possibleMoves
+         in if any ((== target) . Builtin.snd) newStates
+               then cast $ length prevMoves + 1
+               else dfs $ foldr push poppedStates newStates
+
+leastFlips : Wrapper -> Int
+leastFlips (MkWrapper manual@(MkManual target flips _)) =
+  if all (== False) target
+    then 0
+    else manualFlips manual
 
 export
 solve2025D10P1 : String -> Either String Int
 solve2025D10P1 input = do
-  manuals <- sequence $ map (unifyParseOutput . runParser parseManual . unpack) $ lines input
-  pure $ foldl (\prev, manual => prev + leastFlips manual) 0 manuals
+  let ls             = lines input
+      sizeAndChars   = map (\s => (findSize s, unpack s)) ls
+      eitherWrappers = map
+        (\(size, chars) => MkWrapper <$> (unifyParseOutput $ runParser (parseManual size) chars))
+        sizeAndChars
+  wrappers <- sequence eitherWrappers
+  pure $ foldl (\prev, wrapper => prev + leastFlips wrapper) 0 wrappers
 
-applyButtonPress : List Int -> SortedMap Int Int -> SortedMap Int Int
-applyButtonPress flips state = foldl (\oldState, flip => updateExisting (+1) flip oldState) state flips
+applyButtonPress : List (Fin m) -> Vect m Int -> Vect m Int
+applyButtonPress presses state = foldl (\prevState, press => updateAt press (+1) prevState) state presses
 
-record JoltageState where
-  constructor MkJoltageState
-  lastMove     : Int
-  moves        : Int
-  joltageState : SortedMap Int Int
-
-Show JoltageState where
-  show (MkJoltageState lastMove moves state) = "(MkJoltageState " ++ show lastMove ++ " " ++ show moves ++ " " ++ show state ++ ")"
-
-lessThanTarget : SortedMap Int Int -> SortedMap Int Int -> Bool
-lessThanTarget target source =
-  all (\idx => lookup idx source <= lookup idx target) $ keys target
-
-leastPresses : Manual -> Int
-leastPresses (MkManual _ flips targetJoltages) =
-  if all (== 0) $ values targetJoltages
-    then 0
-    else go $ singleton $ MkJoltageState 0 0 $ map (const 0) targetJoltages
+manualPresses : Manual m -> Int
+manualPresses (MkManual _ presses target) = traceVal $ dp (singleton (map (const 0) target) 0) (singleton (map (const 0) target))
   where
-    numFlips = the Int $ cast $ size flips
-    go : Queue JoltageState -> Int
-    go states = case pop states of
-      Nothing                                                    => -111111111111111
-      Just ((MkJoltageState lastMove numMoves lightState), poppedStates) =>
-        let possibleMoves = [lastMove .. numFlips - 1]
-            newStates = filter (\js => lessThanTarget targetJoltages $ joltageState js) $ map
-              (\move => let flips := case lookup move flips of
-                                       Nothing => the (List Int) []
-                                       Just f  => f
-                         in MkJoltageState move (numMoves + 1) (applyButtonPress flips lightState)
-              )
-              possibleMoves
-         in if any ((== targetJoltages) . joltageState) newStates
-              then cast $ numMoves + 1
-              else go $ foldr push poppedStates newStates
+    difference : Vect m Int -> Vect m Int
+    difference = zipWith (-) target
+    dp : SortedMap (Vect m Int) Int -> Queue (Vect m Int) -> Int
+    dp table queue = case pop queue of
+      Nothing                   => -11111111111
+      Just (state, poppedQueue) =>
+        let allPresses = values presses
+            numMoves   = case lookup state table of
+              Nothing => cast $ -11111111111
+              Just n  => n
+            allNewStates = map (\ps => applyButtonPress ps state) allPresses
+            unseenNewStates = filter (\newState => case lookup newState table of
+                                        Just _ => False
+                                        _      => True
+                                ) allNewStates
+            nonLargerNewStates = filter (\newState => all id $ zipWith (<=) newState target) unseenNewStates
+            newTable = foldl
+              (\table', newState => insert newState (numMoves + 1) table')
+              table
+              nonLargerNewStates
+            newQueue = foldr push poppedQueue nonLargerNewStates
+            complementSteps = foldl
+              (\prevMaybe, newState => case prevMaybe of
+                Just v  => Just v
+                Nothing => lookup (difference newState) table
+              ) Nothing nonLargerNewStates
+         in case complementSteps of
+                 Nothing => dp newTable newQueue
+                 Just v  => v + numMoves + 1
+
+leastPresses : Wrapper -> Int
+leastPresses (MkWrapper manual@(MkManual _ _ target)) =
+  if all (== 0) target
+     then 0
+     else manualPresses manual
 
 export
 solve2025D10P2 : String -> Either String Int
 solve2025D10P2 input = do
-  manuals <- sequence $ map (unifyParseOutput . runParser parseManual . unpack) $ lines input
-  pure $ foldl (\prev, manual => prev + leastPresses manual) 0 manuals
+  let ls             = lines input
+      sizeAndChars   = map (\s => (findSize s, unpack s)) ls
+      eitherWrappers = map
+        (\(size, chars) => MkWrapper <$> (unifyParseOutput $ runParser (parseManual size) chars))
+        sizeAndChars
+  wrappers <- sequence eitherWrappers
+  pure $ foldl (\prev, wrapper => prev + leastPresses wrapper) 0 wrappers

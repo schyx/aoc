@@ -1,5 +1,6 @@
 module Parser
 
+import Data.Fin
 import Data.List
 
 public export
@@ -65,3 +66,7 @@ pSpan pred = MkParser $ \input =>
 export
 pInt : Parser Int
 pInt = cast . pack <$> pSpan isDigit
+
+export
+pFin : (m : Nat) -> Parser (Maybe (Fin m))
+pFin m = (\int => integerToFin (cast int) m) <$> pInt
