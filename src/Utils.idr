@@ -13,6 +13,10 @@ namespace Maps
   size : SortedMap a b -> Nat
   size = foldr (\_, prev => prev + 1) 0
 
+  export
+  filterKeys : Ord a => (a -> Bool) -> SortedMap a b -> SortedMap a b
+  filterKeys pred sm = fromList $ filter (pred . fst) $ kvList sm
+
 export
 toIndexedMap : List a -> SortedMap Int a
 toIndexedMap =
