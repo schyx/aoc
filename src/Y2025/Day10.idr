@@ -1,6 +1,5 @@
 module Y2025.Day10
 
-import Debug.Trace
 import Data.Fin
 import Data.SortedMap
 import Data.String
@@ -105,41 +104,59 @@ solve2025D10P1 input = do
   wrappers <- sequence eitherWrappers
   pure $ foldl (\prev, wrapper => prev + leastFlips wrapper) 0 wrappers
 
-applyButtonPress : List (Fin m) -> Vect m Int -> Vect m Int
-applyButtonPress presses state = foldl (\prevState, press => updateAt press (+1) prevState) state presses
+applyMove : (List (Fin m)) -> Vect m Int -> Vect m Int
+applyMove incs state = foldl (\prevState, inc => updateAt inc (+1) prevState) state incs
+
+||| Subtrace left from right
+subtractFrom : Vect m Int -> Vect m Int -> Vect m Int
+subtractFrom l r = zipWith (-) r l
+
+makeParityTable : List (List (Fin m)) -> Vect m Int -> SortedMap (Vect m Bool) (SortedMap (Vect m Int) Int)
+makeParityTable presses target =
+  go
+    (singleton
+      (map (const False) target)
+      (singleton (map (const 0) target) 0))
+    presses
+  where
+    go : SortedMap (Vect m Bool) (SortedMap (Vect m Int) Int)
+      -> (List (List (Fin m)))
+      -> SortedMap (Vect m Bool) (SortedMap (Vect m Int) Int)
+    go table []              = table
+    go table (move :: moves) =
+      let asList        = kvList table
+          appliedParity = map (\(k, v) => (applyFlips move k, v)) asList
+          innerAsList   = map (\(k, v) => (k, kvList v)) appliedParity
+          mapF : (Vect m Int, Int) -> (Vect m Int, Int)
+          mapF (state, count) = (applyMove move state, count + 1)
+          innerMapped   = map (\(k, v) => (k, map mapF v)) innerAsList
+          innerMaps     = map (\(k, v) => (k, SortedMap.fromList v)) innerMapped
+          moveApplied   = SortedMap.fromList innerMaps
+       in go (mergeWith (\tOld, tNew => mergeWith min tOld tNew) table moveApplied) moves
 
 manualPresses : Manual m -> Int
-manualPresses (MkManual _ presses target) = traceVal $ dp (singleton (map (const 0) target) 0) (singleton (map (const 0) target))
+manualPresses (MkManual _ presses target) = Builtin.fst $ go target $ singleton (map (const 0) target) 0
   where
-    difference : Vect m Int -> Vect m Int
-    difference = zipWith (-) target
-    dp : SortedMap (Vect m Int) Int -> Queue (Vect m Int) -> Int
-    dp table queue = case pop queue of
-      Nothing                   => -11111111111
-      Just (state, poppedQueue) =>
-        let allPresses = values presses
-            numMoves   = case lookup state table of
-              Nothing => cast $ -11111111111
-              Just n  => n
-            allNewStates = map (\ps => applyButtonPress ps state) allPresses
-            unseenNewStates = filter (\newState => case lookup newState table of
-                                        Just _ => False
-                                        _      => True
-                                ) allNewStates
-            nonLargerNewStates = filter (\newState => all id $ zipWith (<=) newState target) unseenNewStates
-            newTable = foldl
-              (\table', newState => insert newState (numMoves + 1) table')
-              table
-              nonLargerNewStates
-            newQueue = foldr push poppedQueue nonLargerNewStates
-            complementSteps = foldl
-              (\prevMaybe, newState => case prevMaybe of
-                Just v  => Just v
-                Nothing => lookup (difference newState) table
-              ) Nothing nonLargerNewStates
-         in case complementSteps of
-                 Nothing => dp newTable newQueue
-                 Just v  => v + numMoves + 1
+    parityTable = makeParityTable (values presses) target
+    go : Vect m Int -> SortedMap (Vect m Int) Int -> (Int, SortedMap (Vect m Int) Int)
+    go t table =
+      let tParity      = map ((== 1) . (`mod` 2))  t
+          moves        = case lookup tParity parityTable of
+            Nothing => Prelude.Nil
+            Just ms => kvList ms
+          appliedMoves = map (\(k, v) => (subtractFrom k t, v)) moves
+          pruned       = filter (\(state, _) => all (>= 0) state) appliedMoves
+       in case lookup t table of
+                 Just cached => (cached, table)
+                 Nothing =>
+                   let (value, unaddedTable) = foldl
+                         (\(prevMin, prevTable), (state, stepsToState) =>
+                           let (foundVal, newTable) = go (map (`div` 2) state) prevTable
+                            in (min prevMin $ (2 * foundVal) + stepsToState, newTable)
+                         )
+                         (the Int 10000000, table)
+                         pruned
+                    in (value, insert t value unaddedTable)
 
 leastPresses : Wrapper -> Int
 leastPresses (MkWrapper manual@(MkManual _ _ target)) =

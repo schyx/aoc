@@ -21,6 +21,10 @@ null : Queue a -> Bool
 null (MkQueue f b) = null f && null b
 
 export
+empty : Queue a
+empty = MkQueue [] []
+
+export
 push : a -> Queue a -> Queue a
 push val (MkQueue f b) = MkQueue (val :: f) b
 
