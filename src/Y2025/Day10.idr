@@ -164,6 +164,7 @@ leastPresses (MkWrapper manual@(MkManual _ _ target)) =
      then 0
      else manualPresses manual
 
+||| Solution idea from https://www.reddit.com/r/adventofcode/comments/1pk87hl/2025_day_10_part_2_bifurcate_your_way_to_victory/
 export
 solve2025D10P2 : String -> Either String Int
 solve2025D10P2 input = do
