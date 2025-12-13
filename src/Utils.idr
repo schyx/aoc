@@ -2,6 +2,7 @@ module Utils
 
 import Data.SortedMap
 import Data.SortedSet
+import Data.Vect
 
 namespace Sets
   export
@@ -16,6 +17,12 @@ namespace Maps
   export
   filterKeys : Ord a => (a -> Bool) -> SortedMap a b -> SortedMap a b
   filterKeys pred sm = fromList $ filter (pred . fst) $ kvList sm
+
+namespace Vect
+  export
+  dotProd : Vect m Int -> Vect m Int -> Int
+  dotProd [] []               = 0
+  dotProd (x :: xs) (y :: ys) = x * y + dotProd xs ys
 
 export
 toIndexedMap : List a -> SortedMap Int a
