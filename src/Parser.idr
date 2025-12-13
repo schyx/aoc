@@ -70,3 +70,12 @@ pInt = cast . pack <$> pSpan isDigit
 export
 pFin : (m : Nat) -> Parser (Maybe (Fin m))
 pFin m = (\int => integerToFin (cast int) m) <$> pInt
+
+export
+unifyParseOutput : {a : Type} -> Parser a -> List Char -> Either String a
+unifyParseOutput parser chars =
+  case runParser parser chars of
+       Nothing                  => Left $ "Error parsing input!"
+       Just (v, [])             => Right v
+       Just (_, chars@(_ :: _)) =>
+         Left $ "Parsing resulted in leftover chars: " ++ pack chars

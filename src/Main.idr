@@ -1,6 +1,7 @@
 module Main
 
 import Y2015.Day1
+import Y2015.Day2
 import Y2025.Day1
 import Y2025.Day2
 import Y2025.Day3
@@ -20,6 +21,8 @@ import System.File
 funcAndDataFile : List String -> (String, String -> IO ())
 funcAndDataFile [_, _, "2015", "1", "1"] = ("data/2015/day1.txt", printLn . solve2015D1P1)
 funcAndDataFile [_, _, "2015", "1", "2"] = ("data/2015/day1.txt", printLn . solve2015D1P2)
+funcAndDataFile [_, _, "2015", "2", "1"] = ("data/2015/day2.txt", printLn . solve2015D2P1)
+funcAndDataFile [_, _, "2015", "2", "2"] = ("data/2015/day2.txt", printLn . solve2015D2P2)
 funcAndDataFile [_, _, "2025", "1", "1"] = ("data/2025/day1.txt", printLn . solve2025D1P1)
 funcAndDataFile [_, _, "2025", "1", "2"] = ("data/2025/day1.txt", printLn . solve2025D1P2)
 funcAndDataFile [_, _, "2025", "2", "1"] = ("data/2025/day2.txt", printLn . solve2025D2P1)
